@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"  # Runs every hour to keep it alive
+    - cron: "0 * * * *"  # Runs every hour
 
 jobs:
   run-bot:
@@ -25,7 +25,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Start bot
-        run: python main.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-
+        run: python main.py
