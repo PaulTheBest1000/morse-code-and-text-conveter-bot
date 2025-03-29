@@ -26,10 +26,5 @@ jobs:
 
       - name: Start bot
         run: python main.py
-
-          echo Add other actions to build,
-          echo test, and deploy your project.
-
-          env:
-  BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
