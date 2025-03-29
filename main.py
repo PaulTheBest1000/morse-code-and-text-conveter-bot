@@ -8,7 +8,7 @@ from threading import Thread
 from pydub import AudioSegment
 from pydub.generators import Sine
 
-# Set up Flask app for uptime monitoring
+# Flask app for uptime monitoring
 app = Flask(__name__)
 
 @app.route('/')
@@ -16,7 +16,7 @@ def home():
     return "I'm alive!"  # Response for UptimeRobot
 
 def run():
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, threaded=True)
 
 # Intents setup
 intents = discord.Intents.default()
@@ -35,23 +35,24 @@ STANDARD_MORSE = {
     '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..',
     '9': '----.', '0': '-----', ' ': '/'
 }
-ALTERNATIVE_MORSE = {key: val.replace('.', '•').replace('-', '−') for key, val in STANDARD_MORSE.items()}  # Example alternative
-
+ALTERNATIVE_MORSE = {key: val.replace('.', '•').replace('-', '−') for key, val in STANDARD_MORSE.items()}
 STANDARD_TO_TEXT = {value: key for key, value in STANDARD_MORSE.items()}
 ALTERNATIVE_TO_TEXT = {value: key for key, value in ALTERNATIVE_MORSE.items()}
 
+# Convert Text to Morse
 def text_to_morse(text, morse_dict):
     return ' '.join(morse_dict.get(char.upper(), '?') for char in text)
 
+# Convert Morse to Text
 def morse_to_text(morse, text_dict):
     return ''.join(text_dict.get(code, '?') for code in morse.split())
 
-# Generate Morse code audio at 20 WPM
+# Generate Morse Audio
 def generate_morse_audio(text, morse_dict):
     morse_code = text_to_morse(text, morse_dict)
 
     # Define timing for 20 WPM
-    dot_duration = 60  # Dot duration in ms (1200 / 20 WPM)
+    dot_duration = 60
     dash_duration = dot_duration * 3
     intra_char_space = dot_duration
     inter_char_space = dot_duration * 3
@@ -62,7 +63,7 @@ def generate_morse_audio(text, morse_dict):
     silence = AudioSegment.silent(duration=intra_char_space)
     space = AudioSegment.silent(duration=word_space)
 
-    audio = AudioSegment.silent(duration=500)  # Start with silence
+    audio = AudioSegment.silent(duration=500)
 
     for symbol in morse_code:
         if symbol == "." or symbol == "•":
@@ -74,13 +75,13 @@ def generate_morse_audio(text, morse_dict):
         else:
             audio += AudioSegment.silent(duration=inter_char_space)
 
-    audio = audio + AudioSegment.silent(duration=500)  # End with silence
+    audio = audio + AudioSegment.silent(duration=500)
     audio_buffer = io.BytesIO()
     audio.export(audio_buffer, format="mp3")
     audio_buffer.seek(0)
     return audio_buffer
 
-# Morse type selection dropdown
+# Morse Type Selection
 class MorseTypeSelect(discord.ui.Select):
     def __init__(self, conversion_type, text):
         self.conversion_type = conversion_type
@@ -92,27 +93,24 @@ class MorseTypeSelect(discord.ui.Select):
         super().__init__(placeholder="Select Morse Type", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        if self.values[0] == "standard":
-            morse_dict = STANDARD_MORSE
-            text_dict = STANDARD_TO_TEXT
-        else:
-            morse_dict = ALTERNATIVE_MORSE
-            text_dict = ALTERNATIVE_TO_TEXT
+        await interaction.response.defer()
+
+        morse_dict = STANDARD_MORSE if self.values[0] == "standard" else ALTERNATIVE_MORSE
+        text_dict = STANDARD_TO_TEXT if self.values[0] == "standard" else ALTERNATIVE_TO_TEXT
 
         if self.conversion_type == "text_to_morse":
             morse_code = text_to_morse(self.text, morse_dict)
-            await interaction.response.edit_message(content=f'```Morse Code: {morse_code}```', view=None)
+            await interaction.followup.send(f'```Morse Code: {morse_code}```')
 
         elif self.conversion_type == "text_to_audio":
             audio_file = generate_morse_audio(self.text, morse_dict)
-            await interaction.response.edit_message(content="🔊 Generating your Morse code audio...", view=None)
             await interaction.followup.send(content="🔊 Here is your Morse code audio:", file=discord.File(audio_file, "morse_code.mp3"))
 
         elif self.conversion_type == "morse_to_text":
             decoded_text = morse_to_text(self.text, text_dict)
-            await interaction.response.edit_message(content=f'```Text: {decoded_text}```', view=None)
+            await interaction.followup.send(f'```Text: {decoded_text}```')
 
-# Conversion selection dropdown
+# Conversion Selection
 class ConversionSelect(discord.ui.Select):
     def __init__(self, text):
         self.text = text
@@ -124,9 +122,10 @@ class ConversionSelect(discord.ui.Select):
         super().__init__(placeholder="Select Conversion Type", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(content="📌 Now, select the Morse type:", view=MorseTypeView(self.values[0], self.text))
+        await interaction.response.defer()
+        await interaction.followup.send("📌 Now, select the Morse type:", view=MorseTypeView(self.values[0], self.text))
 
-# Views for dropdowns
+# Views for Dropdowns
 class ConversionView(discord.ui.View):
     def __init__(self, text):
         super().__init__()
